@@ -6,4 +6,4 @@ The current roadblock is my team rating function. It takes in the ADP and positi
 The neural network will initially choose the best player at a random position and update the gradients based on how the team rating changed. As the network is trained,
 it will use the policy net to make decisions, hopefully leading to higher team ratings.
 
-It runs now!!! And the plicy net is significantly better at drafting than random actions.
+It runs now!!! And the policy net is significantly better at drafting than random actions.
