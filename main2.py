@@ -23,33 +23,24 @@ env = envr()
 
 EPS_START = 0.99         # starting value of epsilon
 EPS_END = 0.05          # final value of epsilon
-EPS_DECAY = 5000        # rate of decay, higher = slower
+EPS_DECAY = 50        # rate of decay, higher = slower
 
 BATCH_SIZE = 128        # number of transitions sampled from the replay buffer
 LR = 1e-4               # learning rate of the AdamW optimizer
 GAMMA = 0.99            # discount factor
 TAU = 0.005             # update rate of the target network
 
-def select_action(state):
-    global env
-    global device
-    global policy_net
-    global EPS_START
-    global EPS_END
-    global EPS_DECAY
-    global steps_done
-    # as we train our model, the probability of using our policy net to make decisions increases
+def random_action():
+    return torch.tensor([[env.sample()]], device=device, dtype=torch.long)
 
-    sample = random.random()
-    eps_threshold = EPS_END + (EPS_START - EPS_END) * \
-        math.exp(-1. * steps_done / EPS_DECAY)
-    steps_done += 1
-    if sample > eps_threshold:
-        with torch.no_grad():
-            # picks action with the largest expected reward
-            return policy_net(state).max(1)[1].view(1, 1)
-    else:
-        return torch.tensor([[env.sample()]], device=device, dtype=torch.long)
+def select_action(state):
+    global policy_net
+    print("Used Policy Net")
+    a = policy_net(state)
+    b = a.max(1)[1]
+    c = b.view(1, 1)
+    return c
+    # return policy_net(state).max(1)[1].view(1, 1)
 
 def optimize_model():
     global Transition
@@ -62,7 +53,7 @@ def optimize_model():
     optimizer = optim.AdamW(policy_net.parameters(), lr=LR, amsgrad=True)
     if len(memory) < BATCH_SIZE:
         return
-    print("1")
+    #print("Optimizing")
     transitions = memory.sample(BATCH_SIZE)
     # Transpose the batch (see https://stackoverflow.com/a/19343/3343043 for
     # detailed explanation). This converts batch-array of Transitions
@@ -107,7 +98,7 @@ def main():
 
     adp = new_adp()
     replacements = replacement_adp(adp)
-    num_drafts = 50
+    num_drafts = 100
     team_ratings = []
 
     for i_draft in range(num_drafts):
@@ -116,16 +107,29 @@ def main():
         is_cpu = [True, True, True, True, True, True, True, True, True, True]
         is_cpu[draft_slot - 1] = False
 
+        eps_threshold = EPS_END + (EPS_START - EPS_END) * \
+                        math.exp(-1. * steps_done / EPS_DECAY)
+        steps_done += 1
+        print("eps threshold = " + str(eps_threshold))
+        sample = random.random()
+        print("sample = " + str(sample))
+
         state = env.reset()
         state = torch.tensor(state, dtype=torch.float32, device=device).unsqueeze(0)
         for round in range(1,17):
             for cpu in is_cpu:
                 if cpu:
-                    print("cpu")
+                    #print("cpu")
                     state = env.cpu_draft()
+                    state = torch.tensor(state, dtype=torch.float32, device=device).unsqueeze(0)
                 else:
-                    print("player")
-                    action = select_action(state)
+                    #print("player")
+                    if sample > eps_threshold:
+                        print("Policy Net")
+                        action = select_action(state)
+                    else:
+                        #print("Random Action")
+                        action = random_action()
                     next_state_temp, reward = env.step(action.item())
                     reward = torch.tensor([reward], device=device)
                     if round == 16:
@@ -148,11 +152,18 @@ def main():
 
         ai_team = env.get_team()
         power = team_strength(ai_team,replacements)
-        team_ratings.append(power)
-    #plt.scatter(x=range(1,len(team_ratings) + 1), y=team_ratings)
-    #plt.show()
+        if sample > eps_threshold:
+            team_ratings.append(power)
+
+        final_team = env.get_team()
+        #print("final_team: " + str(final_team))
+        final_power = env.get_power()
+        print("final_power: " + str(final_power))
+        #team_ratings.append(final_power)
+
+    plt.scatter(x=range(1,len(team_ratings) + 1), y=team_ratings)
+    plt.show()
 
 main()
-
 
 print('Complete')
