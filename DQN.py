@@ -17,6 +17,8 @@ class DQN(nn.Module):
     # Called with either one element to determine next action, or a batch
     # during optimization. Returns tensor([[left0exp,right0exp]...]).
     def forward(self, input):
+        if type(input) == list:
+            input = torch.Tensor(input)
         x = self.layer1(input)
         # x = self.batchNorm64(x)
         x = F.relu(x)

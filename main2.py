@@ -15,18 +15,20 @@ steps_done = 0
 Transition = namedtuple('Transition', ('state', 'action', 'next_state', 'reward') )
 memory = ReplayMemory(10000)
 
-policy_net = DQN(8, 4).to(device)
-target_net = DQN(8, 4).to(device)
+policy_net = DQN(12, 4).to(device)
+target_net = DQN(12, 4).to(device)
 target_net.load_state_dict(policy_net.state_dict())
 
 env = envr()
 
+num_drafts = 1000
+
 EPS_START = 0.99         # starting value of epsilon
 EPS_END = 0.05          # final value of epsilon
-EPS_DECAY = 50        # rate of decay, higher = slower
+EPS_DECAY = 100        # rate of decay, higher = slower
 
 BATCH_SIZE = 128        # number of transitions sampled from the replay buffer
-LR = 1e-4               # learning rate of the AdamW optimizer
+LR = 1e-5               # learning rate of the AdamW optimizer
 GAMMA = 0.99            # discount factor
 TAU = 0.005             # update rate of the target network
 
@@ -35,7 +37,7 @@ def random_action():
 
 def select_action(state):
     global policy_net
-    print("Used Policy Net")
+    #print("Used Policy Net")
     a = policy_net(state)
     b = a.max(1)[1]
     c = b.view(1, 1)
@@ -94,25 +96,30 @@ def optimize_model():
 
 def main():
     # if gpu is to be used
-    global device, steps_done, TAU
+    global device, steps_done, TAU, num_drafts
 
     adp = new_adp()
     replacements = replacement_adp(adp)
-    num_drafts = 100
     team_ratings = []
 
+    best_rating = -1000
+    best_team = 0
+    worst_rating = 1000
+    worst_team = 0
+
     for i_draft in range(num_drafts):
+        print(str(i_draft))
         draft_slot = random.randint(1, 10)
-        print("draft slot = " + str(draft_slot))
+        #print("draft slot = " + str(draft_slot))
         is_cpu = [True, True, True, True, True, True, True, True, True, True]
         is_cpu[draft_slot - 1] = False
 
         eps_threshold = EPS_END + (EPS_START - EPS_END) * \
                         math.exp(-1. * steps_done / EPS_DECAY)
         steps_done += 1
-        print("eps threshold = " + str(eps_threshold))
+        #print("eps threshold = " + str(eps_threshold))
         sample = random.random()
-        print("sample = " + str(sample))
+        #print("sample = " + str(sample))
 
         state = env.reset()
         state = torch.tensor(state, dtype=torch.float32, device=device).unsqueeze(0)
@@ -125,7 +132,7 @@ def main():
                 else:
                     #print("player")
                     if sample > eps_threshold:
-                        print("Policy Net")
+                        #print("Policy Net")
                         action = select_action(state)
                     else:
                         #print("Random Action")
@@ -152,8 +159,8 @@ def main():
 
         ai_team = env.get_team()
         power = team_strength(ai_team,replacements)
-        if sample > eps_threshold:
-            team_ratings.append(power)
+        #if sample > eps_threshold:
+        team_ratings.append(power)
 
         final_team = env.get_team()
         #print("final_team: " + str(final_team))
@@ -161,8 +168,22 @@ def main():
         print("final_power: " + str(final_power))
         #team_ratings.append(final_power)
 
+        if final_power > best_rating:
+            best_team = final_team
+            best_rating = final_power
+        if final_power < worst_rating:
+            worst_team = final_team
+            worst_rating = final_power
+
     plt.scatter(x=range(1,len(team_ratings) + 1), y=team_ratings)
+    plt.xlabel("draft number")
+    plt.ylabel("power rating")
     plt.show()
+
+    print("best team")
+    print(best_team)
+    print("worst team")
+    print(worst_team)
 
 main()
 
